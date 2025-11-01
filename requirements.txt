@@ -6,3 +6,4 @@ psycopg2-binary
 python-dotenv
 Flask-Bcrypt  
 Flask-JWT-Extended 
+gunicorn
