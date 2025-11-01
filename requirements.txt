@@ -7,3 +7,4 @@ Flask-Bcrypt
 Flask-JWT-Extended
 Flask-Cors
 gunicorn
+python-dotenv
