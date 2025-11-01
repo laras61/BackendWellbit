@@ -1,52 +1,33 @@
-import os
-from flask import Flask
-from dotenv import load_dotenv
-
-from config.db import db 
-from config.extensions import bcrypt, jwt 
-
+from flask import Flask, jsonify
+from config.db import db, ma
+from config.extensions import bcrypt, jwt
 from models import user_model, order_model, menu_model, notification_model
-from web import api 
-
-# Load .env
-load_dotenv()
+from web import api
 
 app = Flask(__name__)
 
-# ===========================
-# Database
-# ===========================
-db_url = os.environ.get('DATABASE_URL')
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+# Database (hardcode)
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql+psycopg2://postgres:OLLHpNbSjDrUHxtcRGJQJpQGlDeyOZj@turntable.proxy.rlwy.net:48535/railway"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# ===========================
-# JWT
-# ===========================
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY')
+# JWT secret (hardcode)
+app.config['JWT_SECRET_KEY'] = "super-secret-random-string-12345!@#$%"
 
-# ===========================
 # Init extensions
-# ===========================
 db.init_app(app)
+ma.init_app(app)
 bcrypt.init_app(app)
 jwt.init_app(app)
 
 # Register blueprint
-app.register_blueprint(api) 
+app.register_blueprint(api)
 
-# Create tables (if not exists)
 with app.app_context():
     db.create_all()
 
-# Health check
 @app.route("/")
 def home():
-    return {"status":"ok","message":"Backend ready 🚀"}
+    return jsonify({"status":"ok","message":"Backend ready 🚀"})
 
-# Run lokal (optional)
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=True, host="0.0.0.0", port=port)
+    app.run(debug=True, host="0.0.0.0", port=5000)
