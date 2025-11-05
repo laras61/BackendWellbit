@@ -32,23 +32,27 @@ def register_user():
         db.session.add(new_user)
         db.session.commit()
         
-        result = {
+        # Data user yang akan dikembalikan
+        user_data = {
             "id_user": new_user.id_user,
             "name_user": new_user.name_user,
             "email": new_user.email,
             "phone_number": new_user.phone_number,
-            "created_at": new_user.created_at
+            "created_at": new_user.created_at.isoformat() # Ubah ke string
         }
         
         return jsonify({
             "status": "success",
             "message": "User registered successfully",
-            "data": result
+            # PERHATIKAN: Saya ubah 'data' agar konsisten dengan login
+            # Flutter akan butuh 'user' dan 'token'
+            # Kita kirim 'user' di sini
+            "user": user_data 
         }), 201
 
     except IntegrityError as e:
         db.session.rollback()
-        return jsonify({"status": "error", "message": "Database integrity error. Email might be taken."}), 400
+        return jsonify({"status": "error", "message": "Email might be taken."}), 400
     except Exception as e:
         db.session.rollback()
         logging.error(f"Error in register_user: {e}")
@@ -56,7 +60,7 @@ def register_user():
 
 # === 2. LOGIN ===
 def login_user():
-    """Login user dan kembalikan JWT Token."""
+    """Login user dan kembalikan JWT Token BESERTA DATA USER."""
     try:
         data = request.get_json()
         email = data.get('email')
@@ -70,18 +74,31 @@ def login_user():
         if user and user.check_password(password):
             access_token = create_access_token(identity=str(user.id_user))
             
+            # ✅ PERBAIKAN: Sertakan data user saat login
+            # Ini yang dibutuhkan oleh Flutter
+            user_data = {
+                "id_user": user.id_user,
+                "name_user": user.name_user,
+                "email": user.email,
+                "phone_number": user.phone_number,
+                "created_at": user.created_at.isoformat() # Ubah ke string
+            }
+            
             return jsonify({
                 "status": "success",
                 "message": "Login successful",
-                "data": {
-                    "access_token": access_token
-                }
+                # ✅ PERBAIKAN: Kembalikan token DAN user
+                "access_token": access_token,
+                "user": user_data
             }), 200
         else:
             return jsonify({"status": "error", "message": "Invalid email or password"}), 401
 
     except Exception as e:
         logging.error(f"Error in login_user: {e}")
+        # Kirim pesan error "invalid salt" ke Flutter
+        if "invalid salt" in str(e):
+             return jsonify({"status": "error", "message": "Invalid salt. Please re-register this user."}), 401
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # === 3. CEK PROFIL (TERPROTEKSI) ===
@@ -100,7 +117,7 @@ def get_user_profile():
             "name_user": user.name_user,
             "email": user.email,
             "phone_number": user.phone_number,
-            "created_at": user.created_at
+            "created_at": user.created_at.isoformat() # Ubah ke string
         }
         
         return jsonify({
