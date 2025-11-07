@@ -1,4 +1,6 @@
 from flask import Flask, jsonify
+from config.db import db
+from flask_migrate import Migrate
 import os
 from dotenv import load_dotenv
 from flask_cors import CORS
@@ -20,6 +22,7 @@ db.init_app(app)
 ma.init_app(app)
 bcrypt.init_app(app)
 jwt.init_app(app)
+migrate = Migrate(app, db)
 
 from web import api
 app.register_blueprint(api)

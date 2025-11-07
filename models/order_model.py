@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from config.db import db 
 from sqlalchemy.orm import validates 
 
@@ -7,8 +8,9 @@ class Order(db.Model):
     id_order = db.Column(db.Integer, primary_key=True)
     id_user = db.Column(db.Integer, db.ForeignKey('users.id_user'), nullable=False)
     status = db.Column(db.String(50), default='pending')
-    created_at = db.Column(db.TIMESTAMP, server_default=db.func.now())
-
+    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = db.Column(db.DateTime(timezone=True), onupdate=func.now())
+    deleted_at = db.Column(db.DateTime)
     payment_method = db.Column(db.String(50), nullable=False) 
 
     user = db.relationship('User', back_populates='orders')
