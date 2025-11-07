@@ -10,14 +10,21 @@ import logging
 # === 1. MEMBUAT PESANAN BARU (PROTECTED) ===
 @jwt_required()
 def create_order():
+    """Membuat pesanan baru (DENGAN payment_method) dari user yang sedang login."""
     try:
         current_user_id = get_jwt_identity()
         data = request.get_json()
         
         item_list = data.get('items')
+        # [PERUBAHAN] Ambil payment_method dari payload
+        payment_method = data.get('payment_method')
 
+        # [PERUBAHAN] Validasi 'items' DAN 'payment_method'
         if not item_list:
             return jsonify({"status": "error", "message": "Missing items data"}), 400
+        
+        if not payment_method:
+            return jsonify({"status": "error", "message": "Missing payment method"}), 400
 
         total_price = 0
         order_items_to_create = []
@@ -44,40 +51,38 @@ def create_order():
             order_item = OrderItem(
                 id_menu_item=menu_id,
                 quantity=quantity,
-                price=menu.price 
+                price=menu.price
             )
             order_items_to_create.append(order_item)
             menu_names.append(menu.name_menu)
 
-        
         # 1. Buat 'Order' (induknya)
         new_order = Order(
             id_user=current_user_id,
-            status='pending' 
+            status='pending',
+            payment_method=payment_method # [PERUBAHAN] Simpan metode pembayaran
         )
 
-        # 2. Tambahkan semua item ke order
         new_order.items.extend(order_items_to_create)
 
         # 3. Buat notifikasi
-        notif_message = f"Pesanan Anda untuk {', '.join(menu_names)} telah diterima! Total: Rp {total_price}"
+        notif_message = f"Pesanan Anda ({payment_method}) untuk {', '.join(menu_names)} telah diterima! Total: Rp {total_price}"
         new_notification = Notification(
             id_user=current_user_id,
             message=notif_message,
             type='activity'
         )
 
-        # 4. Simpan semuanya ke database
         db.session.add(new_order)
         db.session.add(new_notification)
         db.session.commit()
         
-        # Siapkan data balikan (tanpa schema)
         result = {
             "id_order": new_order.id_order,
             "id_user": new_order.id_user,
-            "total_price": new_order.total_price, # Memanggil properti @property
+            "total_price": new_order.total_price,
             "status": new_order.status,
+            "payment_method": new_order.payment_method, # [PERUBAHAN] Kembalikan di respons
             "created_at": new_order.created_at,
             "items": [
                 {
@@ -94,6 +99,9 @@ def create_order():
             "data": result
         }), 201
 
+    except ValueError as e: # Tangkap error validasi
+        db.session.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 400
     except Exception as e:
         db.session.rollback()
         logging.error(f"Error in create_order: {e}")
@@ -117,7 +125,8 @@ def get_user_orders():
                 "id_order": order.id_order,
                 "status": order.status,
                 "created_at": order.created_at,
-                "total_price": order.total_price, # Memanggil properti @property
+                "total_price": order.total_price,
+                "payment_method": order.payment_method, # [PERUBAHAN] Kembalikan di riwayat
                 "items": [
                     {
                         "id_menu_item": oi.id_menu_item,
