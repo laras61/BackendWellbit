@@ -10,24 +10,21 @@ import logging
 # === 1. MEMBUAT PESANAN BARU (PROTECTED) ===
 @jwt_required()
 def create_order():
-    """Membuat pesanan baru dari user yang sedang login."""
     try:
         current_user_id = get_jwt_identity()
-        
         data = request.get_json()
         
         item_list = data.get('items')
-        delivery_address = data.get('delivery_address')
 
-        if not item_list or not delivery_address:
-            return jsonify({"status": "error", "message": "Missing items or delivery address"}), 400
+        if not item_list:
+            return jsonify({"status": "error", "message": "Missing items data"}), 400
 
         total_price = 0
         order_items_to_create = []
         menu_names = [] 
 
         for item in item_list:
-            menu_id = item.get('id_menu')
+            menu_id = item.get('id_menu_item') 
             quantity = item.get('quantity')
             
             if not menu_id or not quantity or quantity <= 0:
@@ -52,23 +49,22 @@ def create_order():
             order_items_to_create.append(order_item)
             menu_names.append(menu.name_menu)
 
-        # --- Jika semua item valid, buat pesanan ---
         
         # 1. Buat 'Order' (induknya)
         new_order = Order(
             id_user=current_user_id,
-            total_price=total_price,
-            delivery_address=delivery_address,
             status='pending' 
         )
 
+        # 2. Tambahkan semua item ke order
         new_order.items.extend(order_items_to_create)
 
+        # 3. Buat notifikasi
         notif_message = f"Pesanan Anda untuk {', '.join(menu_names)} telah diterima! Total: Rp {total_price}"
         new_notification = Notification(
             id_user=current_user_id,
             message=notif_message,
-            type='activity' # Tipe 'activity' untuk pesanan
+            type='activity'
         )
 
         # 4. Simpan semuanya ke database
@@ -80,9 +76,8 @@ def create_order():
         result = {
             "id_order": new_order.id_order,
             "id_user": new_order.id_user,
-            "total_price": new_order.total_price,
+            "total_price": new_order.total_price, # Memanggil properti @property
             "status": new_order.status,
-            "delivery_address": new_order.delivery_address,
             "created_at": new_order.created_at,
             "items": [
                 {
@@ -111,26 +106,23 @@ def get_user_orders():
     try:
         current_user_id = get_jwt_identity()
         
-        # Ambil semua order milik user tsb, urutkan dari yg terbaru
         orders = Order.query.filter_by(id_user=current_user_id).order_by(Order.created_at.desc()).all()
 
         if not orders:
             return jsonify({"status": "success", "message": "You have no orders yet", "data": []}), 200
         
-        # Ubah jadi list dictionary
         result = []
         for order in orders:
             result.append({
                 "id_order": order.id_order,
                 "status": order.status,
-                "delivery_address": order.delivery_address,
                 "created_at": order.created_at,
+                "total_price": order.total_price, # Memanggil properti @property
                 "items": [
                     {
                         "id_menu_item": oi.id_menu_item,
                         "quantity": oi.quantity,
                         "price": oi.price,
-                        # Kita tambahkan info nama menu agar gampang
                         "name_menu": oi.menu_item.name_menu if oi.menu_item else "Menu not found"
                     } for oi in order.items
                 ]
